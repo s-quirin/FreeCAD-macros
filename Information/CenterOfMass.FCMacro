@@ -25,8 +25,8 @@
 __Name__ = 'CenterOfMass'
 __Comment__ = 'Compute and show the center of mass for multiple solids'
 __Author__ = 'chupins, s-quirin'
-__Version__ = '0.7.6'
-__Date__ = '2024-07-18'
+__Version__ = '0.7.7'
+__Date__ = '2024-09-18'
 __License__ = 'LGPL-3.0-or-later'
 __Web__ = 'https://forum.freecad.org/viewtopic.php?f=24&t=31883'
 __Wiki__ = 'https://wiki.freecad.org/Macro_CenterOfMass'
@@ -39,9 +39,6 @@ __Files__ = ''
 
 # Todo:
 # - error with draft array of meshes (relevant?)
-# - App:Link lacks the .getGlobalPlacement() method and childShapes() do not equal,
-# so .InListRecursive and .OutList is used as a workaround.
-# @realthunder proposes https://forum.freecad.org/viewtopic.php?p=569083#p569083
 # Ideas:
 # - moments of inertia with arrows that allow the user to see the relative magnitudes
 
@@ -81,7 +78,9 @@ CUSTOM_MAT_DIR = MATERIAL_SETTINGS.GetString('CustomMaterialsDir', '')
 WINDOW_WIDTH = int(0.2 * QtGui.QGuiApplication.screens()[0].geometry().width())
 WINDOW_HEIGHT = int(0.5 * QtGui.QGuiApplication.screens()[0].geometry().height())
 
-if float(f'{app.Version()[0]}.{app.Version()[1]}') < 0.21:
+FREECAD_VERSION = float(f'{app.Version()[0]}.{app.Version()[1]}')
+
+if FREECAD_VERSION < 0.21:
     # FreeCAD 0.20 is able to run with Qt 5.9.5 but Qt 5.12 was adopted here
     if QtCore.QLibraryInfo.version() < QtCore.QVersionNumber(5,12):
         app.Console.PrintWarning('Qt 5.12 or higher is needed to run\n')
@@ -637,7 +636,7 @@ class CenterofmassWidget(QtGui.QWidget):
 
         # create valid objects list (e.g. shapes)
         import Part
-        if float(f'{app.Version()[0]}.{app.Version()[1]}') >= 0.22:
+        if FREECAD_VERSION >= 0.22:
             import UtilsAssembly
         objs = []
         for i_, s_ in enumerate(vsel):
@@ -647,7 +646,7 @@ class CenterofmassWidget(QtGui.QWidget):
                 if callable(getattr(s_, 'getGlobalPlacement', None)):
                     o_.Placement = s_.getGlobalPlacement()
                     # e.g. App::Link has no method getGlobalPlacement
-                elif float(f'{app.Version()[0]}.{app.Version()[1]}') < 0.22:
+                elif FREECAD_VERSION < 0.22:
                     if s_.InList:
                         for it in s_.InListRecursive:
                             o_.Placement = o_.Placement.multiply(it.Placement)
@@ -705,7 +704,7 @@ class CenterofmassWidget(QtGui.QWidget):
         from pathlib import Path
         resources: list[Path] = []
         if USE_BUILT_IN_MATERIALS:
-            if float(f'{app.Version()[0]}.{app.Version()[1]}') < 0.22:
+            if FREECAD_VERSION < 0.22:
                 resources.append(Path(app.getResourceDir(), "Mod", "Material", "StandardMaterial"))
             else:
                 resources.append(Path(
@@ -715,12 +714,13 @@ class CenterofmassWidget(QtGui.QWidget):
             resources.append(Path(app.ConfigGet("UserAppData"), "Material"))
         if USE_MAT_FROM_CUSTOM_DIR and CUSTOM_MAT_DIR:
             resources.append(Path(CUSTOM_MAT_DIR))
-        print('Looking for material cards according to',
-              'User parameter:BaseApp/Preferences/Mod/Material/Resources')
+        app.Console.PrintMessage('Looking for material cards according to ' +
+            'User parameter:BaseApp/Preferences/Mod/Material/Resources' + '\n')
 
         # Read material cards
         for p in resources:
-            print(f'  {p}')    # cards found later with same name will override previous ones
+            app.Console.PrintMessage(f'  {p}' + '\n')
+            # cards found later with same name will override previous ones
             dir_gen = p.rglob('*.FCMat')   # is generator -> use only once
             for f in dir_gen:
                 if f.stem == 'Default':
@@ -1092,7 +1092,7 @@ class CenterofmassWidget(QtGui.QWidget):
                 g_sel[sol].Mat_Name = mat_selected
                 # Density
                 if not hasattr(g_sel[sol], 'Mat_Density'):
-                    if float(f'{app.Version()[0]}.{app.Version()[1]}') < 0.22:
+                    if FREECAD_VERSION < 0.22:
                         g_sel[sol].addProperty('App::PropertyString', 'Mat_Density', *tip)
                     else:
                         # 'App::PropertyDensity' available since FreeCAD 0.21
@@ -1247,7 +1247,7 @@ if __name__ == '__main__':
     elif not app.activeDocument():
         error_message('Open a document first.')
     else:
-        print('Loading ' + __Name__ + ' ' + __Version__ + ' ...')
+        app.Console.PrintMessage(f'Loading {__Name__} {__Version__} ...' + '\n')
         gui.updateGui()
         if DOCKED_WINDOW:
             myWidget = CenterofmassDock()
